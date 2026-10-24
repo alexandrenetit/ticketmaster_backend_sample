@@ -30,7 +30,7 @@ A arquitetura evolui em **10 camadas incrementais**, cada uma nascida de um requ
 ## 2. Estrutura do repositório
 
 ```
-SDD/
+root/
 ├── README.md                          ← este arquivo (índice e visão geral)
 │
 ├── .specify/                          ← núcleo do Spec Kit (governança e templates)
@@ -139,7 +139,7 @@ docker compose --profile app up -d --build  # stack completa (exige scaffold em 
 
 ## 7. Fontes de entrada
 
-- **System Design - Plataforma TicketMaster.md** — `C:\Users\alexa\OneDrive\Documents\Obsidian Vault\_Estudos\Arquitetura de Software\Arquitetura Ticket Master\System Design - Plataforma TicketMaster.md` (requisitos funcionais/não funcionais e evoluções da arquitetura).
+- **System Design - Plataforma TicketMaster.md** — `Arquitetura Ticket Master\System Design - Plataforma TicketMaster.md` (requisitos funcionais/não funcionais e evoluções da arquitetura).
 - **[Slides_Solucao.pdf](../Slides_Solucao.pdf)** — slides com os diagramas e o fluxo consolidado.
 - **[github/spec-kit](https://github.com/github/spec-kit)** — metodologia e templates SDD.
 

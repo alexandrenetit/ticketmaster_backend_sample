@@ -1,0 +1,35 @@
+{
+  "ReverseProxy": {
+    "Routes": {
+      "events": {
+        "ClusterId": "event-service",
+        "Match": { "Path": "/v1/events/{**catch-all}" }
+      },
+      "search": {
+        "ClusterId": "search-service",
+        "Match": { "Path": "/v1/search/{**catch-all}" }
+      },
+      "bookings": {
+        "ClusterId": "booking-service",
+        "Match": { "Path": "/v1/bookings/{**catch-all}" }
+      }
+    },
+    "Clusters": {
+      "event-service": {
+        "Destinations": {
+          "d1": { "Address": "http://event-service:8080/" }
+        }
+      },
+      "search-service": {
+        "Destinations": {
+          "d1": { "Address": "http://search-service:8080/" }
+        }
+      },
+      "booking-service": {
+        "Destinations": {
+          "d1": { "Address": "http://booking-service:8080/" }
+        }
+      }
+    }
+  }
+}

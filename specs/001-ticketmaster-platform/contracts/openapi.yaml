@@ -1,0 +1,357 @@
+openapi: 3.1.0
+info:
+  title: TicketMaster Platform API
+  version: 1.0.0
+  description: >
+    Contrato REST (v1) da réplica TicketMaster. Rotas expostas pelo ApiGateway (YARP)
+    e implementadas por EventService, SearchService e BookingService.
+servers:
+  - url: http://localhost:8080
+    description: ApiGateway local (WSL Ubuntu + Docker)
+
+tags:
+  - name: Events
+  - name: Search
+  - name: Bookings
+
+paths:
+  /v1/events:
+    get:
+      tags: [Events]
+      operationId: listEvents
+      summary: Lista eventos publicados (paginação por cursor)
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+      responses:
+        '200':
+          description: Lista paginada de eventos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/EventSummary' }
+                  nextCursor: { type: string, nullable: true }
+    post:
+      tags: [Events]
+      operationId: createEvent
+      summary: Cria um evento (admin)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EventInput' }
+      responses:
+        '201':
+          description: Evento criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
+
+  /v1/events/{eventId}:
+    get:
+      tags: [Events]
+      operationId: getEvent
+      summary: Retorna um evento com mapa de assentos e disponibilidade
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Evento detalhado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Events]
+      operationId: updateEvent
+      summary: Atualiza um evento (admin)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EventInput' }
+      responses:
+        '200':
+          description: Evento atualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
+    delete:
+      tags: [Events]
+      operationId: deleteEvent
+      summary: Remove/cancela um evento (admin)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Removido }
+
+  /v1/search:
+    get:
+      tags: [Search]
+      operationId: searchEvents
+      summary: Pesquisa eventos (full-text, typos + stemming)
+      parameters:
+        - name: keyword
+          in: query
+          required: true
+          schema: { type: string }
+        - name: startDate
+          in: query
+          schema: { type: string, format: date }
+        - name: endDate
+          in: query
+          schema: { type: string, format: date }
+        - name: type
+          in: query
+          schema: { type: string }
+        - name: city
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+      responses:
+        '200':
+          description: Resultados relevantes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/SearchResult' }
+
+  /v1/bookings/reserve:
+    post:
+      tags: [Bookings]
+      operationId: reserveTickets
+      summary: Reserva temporária de ingressos (TTL 7 min) — atômica (tudo ou nada)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tickets, userId]
+              properties:
+                tickets:
+                  type: array
+                  description: Se qualquer item falhar, nenhum é reservado (rollback).
+                  items:
+                    type: object
+                    required: [ticketId]
+                    properties:
+                      ticketId: { type: string, format: uuid }
+                      quantity: { type: integer, minimum: 1, default: 1 }
+                userId: { type: string, format: uuid }
+      responses:
+        '202':
+          description: Reserva criada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reservationId: { type: string }
+                  expiresAt: { type: string, format: date-time }
+        '409':
+          description: Um ou mais assentos já reservados
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /v1/bookings/{reservationId}/pay:
+    post:
+      tags: [Bookings]
+      operationId: payBooking
+      summary: Inicia o pagamento (Stripe); a efetivação é confirmada por webhook
+      parameters:
+        - name: reservationId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paymentMethodId]
+              properties:
+                paymentMethodId: { type: string }
+      responses:
+        '202':
+          description: Pagamento iniciado; efetivação via webhook (consulte GET /v1/bookings/{bookingId})
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PendingPayment' }
+        '402':
+          description: Pagamento recusado
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/bookings/{bookingId}:
+    get:
+      tags: [Bookings]
+      operationId: getBooking
+      summary: Consulta o status de um booking/compra
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Status do booking
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Booking' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/webhooks/stripe:
+    post:
+      tags: [Bookings]
+      operationId: stripeWebhook
+      summary: Webhook de resultado do Stripe (assinado)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Processado (idempotente) }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Conflito de estado (assento já reservado)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+        correlationId: { type: string }
+
+    EventSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        description: { type: string }
+        artist: { type: string }
+        date: { type: string, format: date-time }
+        type: { type: string }
+        venue: { type: string }
+        priceFrom: { type: number }
+
+    Event:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        venueId: { type: string, format: uuid }
+        description: { type: string }
+        artist: { type: string }
+        date: { type: string, format: date-time }
+        type: { type: string }
+        status: { type: string, enum: [draft, published, sold_out, cancelled] }
+        seatMap:
+          type: array
+          items:
+            type: object
+            properties:
+              seat: { type: string, nullable: true }
+              area: { type: string, nullable: true }
+              type: { type: string }
+              price: { type: number }
+              quantity: { type: integer }
+              status: { type: string, enum: [available, unavailable, booked] }
+
+    EventInput:
+      type: object
+      required: [venueId, description, date, type]
+      properties:
+        venueId: { type: string, format: uuid }
+        description: { type: string }
+        artist: { type: string }
+        date: { type: string, format: date-time }
+        type: { type: string }
+        seatMap:
+          type: array
+          items:
+            type: object
+            properties:
+              seat: { type: string, nullable: true }
+              area: { type: string, nullable: true }
+              type: { type: string }
+              price: { type: number }
+              quantity: { type: integer }
+
+    SearchResult:
+      type: object
+      properties:
+        eventId: { type: string, format: uuid }
+        description: { type: string }
+        artist: { type: string }
+        date: { type: string, format: date-time }
+        type: { type: string }
+        venue: { type: string }
+        city: { type: string }
+        priceFrom: { type: number }
+        score: { type: number }
+
+    Booking:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        ticketId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        status: { type: string, enum: [confirmed, cancelled, refunded] }
+        paymentRef: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    PendingPayment:
+      type: object
+      properties:
+        paymentRef: { type: string }
+        status: { type: string, enum: [pending, requires_action, succeeded, failed] }
+        clientSecret: { type: string, nullable: true }

@@ -1,0 +1,25 @@
+# ============================================================================
+# ALTA DISPONIBILIDADE (Evolução 10) — guia local para WSL Ubuntu + Docker.
+#
+# ⚠️ CORREÇÃO DE REVISÃO: a versão anterior usava `deploy.replicas`, que é
+# IGNORADO pelo `docker compose up` (só funciona no modo Swarm: `docker stack`).
+# Portanto este arquivo NÃO é aplicado automaticamente — é um guia.
+#
+# Para escalar em Docker Compose (modo standalone), use --scale:
+#   docker compose --profile app up -d --build \
+#     --scale api-gateway=2 \
+#     --scale event-service=3 \
+#     --scale search-service=3 \
+#     --scale booking-service=3
+#
+# Limitações conhecidas do modo standalone (documentadas, não escondidas):
+#   - Load Balancer real: exige um LB externo (ex.: nginx/haproxy) ou Swarm.
+#   - Redis Sentinel / Cluster: o compose sobe 1 nó Redis; o HA real é T036.
+#   - Postgres read-replica: requer streaming (pg_hba + slot) — T036.
+#
+# Em produção/Swarm, o override abaixo seria válido (substituir --scale):
+#   services:
+#     event-service:
+#       deploy:
+#         replicas: 3
+# ============================================================================

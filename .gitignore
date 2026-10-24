@@ -1,0 +1,18 @@
+# Segredos e artefatos locais — nunca versionar
+.env
+*.env
+*.user
+*.suo
+
+# Build .NET
+bin/
+obj/
+*.csproj.user
+
+# Artefatos de runtime/containers
+*.log
+
+# IDE
+.vs/
+.idea/
+.vscode/

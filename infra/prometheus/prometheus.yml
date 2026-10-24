@@ -1,0 +1,22 @@
+# Prometheus — alvos de métricas da plataforma TicketMaster.
+# Os serviços .NET expõem /metrics via OpenTelemetry.Exporter.Prometheus.AspNetCore
+# (implementado em tasks.md T008). O Worker usa OTLP; o scrape HTTP é opcional.
+
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: 'ticketmaster-services'
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - api-gateway:8080
+          - event-service:8080
+          - search-service:8080
+          - booking-service:8080
+          - worker:8080
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
